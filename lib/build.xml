@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="barcodeupdate" default="inspiry">
+	
+    <loadproperties srcFile="local.properties" />
+    <loadproperties srcFile="project.properties" />
+	
+	<property name="key.store" value="release.keystore"/>
+	<property name="key.alias" value="android"/>
+	<property name="key.store.password" value="inspiry"/>
+	<property name="key.alias.password" value="inspiry"/>
+
+	<condition property="sdk.dir" value="${win.sdk.dir}" else="${linux.sdk.dir}"><os family="windows" /></condition>
+	<condition property="ndk.dir" value="${win.ndk.dir}" else="${linux.ndk.dir}"><os family="windows" /></condition>
+	<condition property="__ndk-cmd" value="${ndk.dir}/ndk-build.cmd" else="${ndk.dir}/ndk-build"><os family="windows" /></condition>
+	
+
+    <fail message="sdk.dir is missing. Make sure to generate local.properties using 'android update project'" unless="sdk.dir" />
+    <fail message="ndk.dir is missing. Make sure to generate local.properties using 'android update project'" unless="ndk.dir" />
+	
+    <import file="${sdk.dir}/tools/ant/build.xml" />
+	
+	<target name="inspiry_native_lib">
+		<echo message="Building native libraries..." />
+        <exec executable="${__ndk-cmd}" failonerror="true" />
+        <echo message="DONE (Building native libraries)" />
+	</target>
+	<!--inspiry_native_lib 一定要在release 前边， 因为release 要打包apk， 需要包含native 部分， 否则 没有native库-->
+	<target name="inspiry" depends="inspiry_native_lib, release">
+		<!-- 通过com.inspiry.barcodeupdate.build.util 类，获取sdk版本号，该版本号用于接下来的构建-->
+		<java classname="com.inspiry.barcodeupdate.build.util"
+			classpath="${out.dir}/classes" 
+			outputproperty="output"
+			failonerror="true">
+			<arg line="getVersion" />
+		</java>
+		<echo> prepare build sdk version: ${output} ...</echo>
+		<!--再次启动ant, 传入target=inspiry-build 以及 版本号-->
+		<ant target="inspiry-build" inheritAll="false">
+			<property name="inspiry.sdk.version" value="${output}"/>
+			<property name="inspiry.outdir" value="${inspiry.outdir}"/>
+			<property name="inspiry.device.model" value="${inspiry.device.model}"/>
+			<property name="inspiry.device.chip" value="${inspiry.device.chip}"/>
+		</ant>
+	</target>
+	<target name="inspiry-build" depends="inspiry_sdk">
+		<echo> build sdk version: ${inspiry.sdk.version} success</echo>
+	</target>
+	
+	<property name="inspiry.sdk.dir" value="${inspiry.outdir}/sdk-${inspiry.device.model}-${inspiry.device.chip}-V${inspiry.sdk.version}" />
+	<property name="inspiry.sdk.jar.dir" value="${inspiry.sdk.dir}/jar" />
+	<property name="inspiry.sdk.native.dir" value="${inspiry.sdk.dir}/libs" />
+	<property name="inspiry.sdk.doc.dir" value="${inspiry.sdk.dir}/doc" />
+	<property name="inspiry.sdk.jar.name" value="inspiry_update.jar" />
+	
+	
+	<target name="inspiry_sdk" depends="inspiry_jar_lib_doc, inspiry_jar_lib">
+	
+		<delete dir="${inspiry.sdk.native.dir}" />
+		<mkdir dir="${inspiry.sdk.native.dir}"/>
+		<!--copydir dest="${inspiry.sdk.native.dir}" src="libs"> 
+		</copydir--> 
+		<tstamp prefix="buildtime" >
+			<format property="TimeSign" pattern="yyyy-MM-dd-HHmmss" />
+		</tstamp>
+		<copy todir="${inspiry.sdk.native.dir}" >
+			<fileset dir="libs"/>
+		</copy>
+		<property name="inspiry.sdk.release.name" value="${inspiry.outdir}/${inspiry.device.model}-${inspiry.device.chip}-V${inspiry.sdk.version}-SDK-${buildtime.TimeSign}-outside.tar" />
+		<tar destfile="${inspiry.sdk.release.name}"  >
+			<fileset dir="${inspiry.sdk.dir}"/>
+		</tar>
+		<!--
+		<copy todir="${inspiry.outdir}">
+			<fileset dir="${out.dir}" includes="**release.apk"/>
+		</copy>
+		-->
+		<copy file="${out.dir}/barcodeupdate-release.apk" tofile="${inspiry.outdir}/${inspiry.device.model}-${inspiry.device.chip}-V${inspiry.sdk.version}-APK-${buildtime.TimeSign}-inside.apk"/>
+	</target>
+	
+
+	
+	<target name="inspiry_jar_lib" depends="inspiry_native_lib">
+		<delete dir="${inspiry.sdk.jar.dir}" />
+		<mkdir dir="${inspiry.sdk.jar.dir}"/>
+		<jar destfile="${inspiry.sdk.jar.dir}/${inspiry.sdk.jar.name}">
+			<fileset dir="${out.dir}/classes"
+					includes="**/*.class"
+					excludes="**/R.class **/R$*.class  **/MainActivity.class  **/MainActivity$*.class **/BuildConfig.class **/build/**"/>
+		</jar>
+	</target>
+	
+	<target name="inspiry_jar_lib_doc" depends="inspiry_jar_lib">
+		<delete dir="${inspiry.sdk.doc.dir}" />
+		<mkdir dir="${inspiry.sdk.doc.dir}"/>
+		<javadoc destdir="${inspiry.sdk.doc.dir}" charset="UTF-8" encoding="UTF-8" docencoding="UTF-8">
+			<fileset dir="${source.dir}" includes="**/BarCodeSerialUpdateWrapper.java **/OnEventAvailableListener.java" />
+      </javadoc>
+	</target>
+	<target name ="inspiry-clean" depends="clean">
+		<delete dir="${out.dir}" />
+		<delete dir="${gen.absolute.dir}" />
+		<delete dir="${native.libs.absolute.dir}"/>
+		<delete dir="obj"/>
+	</target>
+</project>

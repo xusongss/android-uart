@@ -1,0 +1,20 @@
+<project name="barcodeupdate" default="inspiry">
+	<loadproperties srcFile="misc.properties" />
+	<property name="inspiry.outdir" value="${basedir}/out"/>
+	<target name="inspiry">
+		<mkdir dir="${inspiry.outdir}"/>
+		<ant dir="lib" target="inspiry" inheritAll="true" />
+		<echo> build success!!!</echo>
+		<script language="javascript">
+			project.setProperty('inspiry.device.model', project.getProperty('inspiry.device.model').replace('&amp;', ' '));
+			project.setProperty('inspiry.device.chip', project.getProperty('inspiry.device.chip').replace('&amp;', ' '));
+		</script>
+		<echo message="surport model : ${inspiry.device.model}"/>
+		<echo message="surport chip : ${inspiry.device.chip}"/>
+		
+	</target>
+	<target name="clean">
+		<ant dir="lib" target="inspiry-clean" inheritAll="true"/>
+		<delete dir="${inspiry.outdir}" />
+	</target>
+</project>
